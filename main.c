@@ -11,8 +11,6 @@
 *********************************************************************************/
 
 #include <inttypes.h>
-
-#include "../main/ble_compatibility_test.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -24,16 +22,42 @@
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_bt_main.h"
+#include "ble_compatibility_test.h"
 #include "esp_gatt_common_api.h"
 
-#include "General_def.h"
-#include "devices_manager.h"
+#define DEBUG_ON  0
 
+#if DEBUG_ON
+#define EXAMPLE_DEBUG ESP_LOGI
+#else
+#define EXAMPLE_DEBUG( tag, format, ... )
+#endif
+
+#define EXAMPLE_TAG "BLE_COMP"
+
+#define PROFILE_NUM                 1
+#define PROFILE_APP_IDX             0
+#define ESP_APP_ID                  0x55
+#define SAMPLE_DEVICE_NAME          "BLE_COMP_TEST"
+#define SVC_INST_ID                 0
+
+/* The max length of characteristic value. When the gatt client write or prepare write,
+*  the data length must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
+*/
+#define GATTS_EXAMPLE_CHAR_VAL_LEN_MAX 500
+#define LONG_CHAR_VAL_LEN           500
+#define SHORT_CHAR_VAL_LEN          10
+#define GATTS_NOTIFY_FIRST_PACKET_LEN_MAX 20
+
+#define PREPARE_BUF_MAX_SIZE        1024
+#define CHAR_DECLARATION_SIZE       (sizeof(uint8_t))
+
+#define ADV_CONFIG_FLAG             (1 << 0)
+#define SCAN_RSP_CONFIG_FLAG        (1 << 1)
 
 static uint8_t adv_config_done       = 0;
 
-//uint16_t gatt_db_handle_table[HRS_IDX_NB];
-uint16_t gatt_db_handle_table_gate[DATABASE_END];
+uint16_t gatt_db_handle_table[HRS_IDX_NB];
 
 typedef struct {
     uint8_t                 *prepare_buf;
@@ -142,119 +166,81 @@ static struct gatts_profile_inst heart_rate_profile_tab[PROFILE_NUM] = {
 
 /* Service */
 static const uint16_t GATTS_SERVICE_UUID_TEST      = 0x00FF;
-static const uint16_t CHAR_1_SHORT_WR              = 0xFF01; // a cosa serve che sia così ?
-//static const uint16_t CHAR_2_LONG_WR               = 0xFF02;
-//static const uint16_t CHAR_3_SHORT_NOTIFY          = 0xFF03;
+static const uint16_t CHAR_1_SHORT_WR              = 0xFF01;
+static const uint16_t CHAR_2_LONG_WR               = 0xFF02;
+static const uint16_t CHAR_3_SHORT_NOTIFY          = 0xFF03;
 
 static const uint16_t primary_service_uuid         = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t character_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
 static const uint16_t character_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
 static const uint16_t character_user_description   = ESP_GATT_UUID_CHAR_DESCRIPTION;
-//static const uint8_t char_prop_notify              = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+static const uint8_t char_prop_notify              = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 static const uint8_t char_prop_read_write          = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ;
-//static const uint8_t char1_name[]  = "Char_1_Short_WR";
-//static const uint8_t char2_name[]  = "Char_2_Long_WR";
-//static const uint8_t char3_name[]  = "Char_3_Short_Notify";
+static const uint8_t char1_name[]  = "Char_1_Short_WR";
+static const uint8_t char2_name[]  = "Char_2_Long_WR";
+static const uint8_t char3_name[]  = "Char_3_Short_Notify";
 static const uint8_t char_ccc[2]   = {0x00, 0x00};
-//static const uint8_t char_value[4] = {0x11, 0x22, 0x33, 0x44};
-
-static const uint8_t char1_name[]  = "Motor Model";
-uint8_t Motor_model[]= "Benini";
+static const uint8_t char_value[4] = {0x11, 0x22, 0x33, 0x44};
 
 
 /* Full Database Description - Used to add attributes into the database */
-//static const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
-//{
-//    // Service Declaration
-//    [IDX_SVC]        =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid, ESP_GATT_PERM_READ,
-//      sizeof(uint16_t), sizeof(GATTS_SERVICE_UUID_TEST), (uint8_t *)&GATTS_SERVICE_UUID_TEST}},
-//
-//    /* Characteristic Declaration */
-//    [IDX_CHAR_A]     =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-//      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
-//
-//    /* Characteristic Value */
-//    [IDX_CHAR_VAL_A] =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-//      SHORT_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
-//
-//    /* Characteristic User Descriptor */
-//    [IDX_CHAR_CFG_A]  =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-//      sizeof(char1_name), sizeof(char1_name), (uint8_t *)char1_name}},
-//
-//    /* Characteristic Declaration */
-//    [IDX_CHAR_B]      =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-//      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
-//
-//    /* Characteristic Value */
-//    [IDX_CHAR_VAL_B]  =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_2_LONG_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-//      LONG_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
-//
-//       /* Characteristic User Descriptor */
-//    [IDX_CHAR_CFG_B]  =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-//      sizeof(char2_name), sizeof(char2_name), (uint8_t *)char2_name}},
-//
-//   /* Characteristic Declaration */
-//    [IDX_CHAR_C]      =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-//      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_notify}},
-//
-//    /* Characteristic Value */
-//    [IDX_CHAR_VAL_C]  =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_3_SHORT_NOTIFY, 0,
-//      LONG_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
-//
-//    /* Characteristic User Descriptor */
-//    [IDX_CHAR_CFG_C]  =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-//      sizeof(char3_name), sizeof(char3_name), (uint8_t *)char3_name}},
-//
-//    /* Characteristic Client Configuration Descriptor */
-//    [IDX_CHAR_CFG_C_2]  =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-//      sizeof(uint16_t), sizeof(char_ccc), (uint8_t *)char_ccc}},
-//
-//};
-
-/*Database cancello*/
-static const esp_gatts_attr_db_t gatt_db_gate[DATABASE_END] =
+static const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 {
-		[IDX_SVC]        =
-		{{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid, ESP_GATT_PERM_READ,
-				sizeof(uint16_t), sizeof(GATTS_SERVICE_UUID_TEST), (uint8_t *)&GATTS_SERVICE_UUID_TEST}},
+    // Service Declaration
+    [IDX_SVC]        =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid, ESP_GATT_PERM_READ,
+      sizeof(uint16_t), sizeof(GATTS_SERVICE_UUID_TEST), (uint8_t *)&GATTS_SERVICE_UUID_TEST}},
 
-		 /* Characteristic Declaration */
-		[MOTOR_MODEL_DECL]     =
-		{{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-		  CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
+    /* Characteristic Declaration */
+    [IDX_CHAR_A]     =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
 
-		/* Characteristic Value */
-//		[IDX_CHAR_VAL_A] =
-//		{{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-//		  SHORT_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
-		[MOTOR_MODEL_VAL]=
-		{{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-				sizeof(Motor_model), sizeof(Motor_model), (uint8_t *)Motor_model}},
+    /* Characteristic Value */
+    [IDX_CHAR_VAL_A] =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
+      SHORT_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
 
-		/* Characteristic User Descriptor */
-		[MOTOR_MODEL_CFG]  =
-		{{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-		  sizeof(char1_name), sizeof(char1_name), (uint8_t *)char1_name}},
+    /* Characteristic User Descriptor */
+    [IDX_CHAR_CFG_A]  =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+      sizeof(char1_name), sizeof(char1_name), (uint8_t *)char1_name}},
 
-//		[MOTOR_MODEL]=
-//		{{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-//				sizeof(Motor_model), sizeof(Motor_model), (uint8_t *)Motor_model}},
+    /* Characteristic Declaration */
+    [IDX_CHAR_B]      =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
 
-	  /* Characteristic Client Configuration Descriptor */
-	  [IDX_CHAR_CFG_C_2]  =
-	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-		sizeof(uint16_t), sizeof(char_ccc), (uint8_t *)char_ccc}},
+    /* Characteristic Value */
+    [IDX_CHAR_VAL_B]  =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_2_LONG_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+      LONG_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
+
+       /* Characteristic User Descriptor */
+    [IDX_CHAR_CFG_B]  =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+      sizeof(char2_name), sizeof(char2_name), (uint8_t *)char2_name}},
+
+   /* Characteristic Declaration */
+    [IDX_CHAR_C]      =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_notify}},
+
+    /* Characteristic Value */
+    [IDX_CHAR_VAL_C]  =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_3_SHORT_NOTIFY, 0,
+      LONG_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
+
+    /* Characteristic User Descriptor */
+    [IDX_CHAR_CFG_C]  =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+      sizeof(char3_name), sizeof(char3_name), (uint8_t *)char3_name}},
+
+    /* Characteristic Client Configuration Descriptor */
+    [IDX_CHAR_CFG_C_2]  =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+      sizeof(uint16_t), sizeof(char_ccc), (uint8_t *)char_ccc}},
+
 };
 
 static void show_bonded_devices(void)
@@ -508,7 +494,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             }
             adv_config_done |= SCAN_RSP_CONFIG_FLAG;
     #endif
-            esp_err_t create_attr_ret = esp_ble_gatts_create_attr_tab(gatt_db_gate, gatts_if, DATABASE_END, SVC_INST_ID);
+            esp_err_t create_attr_ret = esp_ble_gatts_create_attr_tab(gatt_db, gatts_if, HRS_IDX_NB, SVC_INST_ID);
             if (create_attr_ret){
                 ESP_LOGE(EXAMPLE_TAG, "create attr table failed, error code = %x", create_attr_ret);
             }
@@ -516,56 +502,55 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
        	    break;
         case ESP_GATTS_READ_EVT:
             //ESP_LOGE(EXAMPLE_TAG, "ESP_GATTS_READ_EVT, handle=0x%d, offset=%d", param->read.handle, param->read.offset);
-            if(gatt_db_handle_table_gate[MOTOR_MODEL_VAL] == param->read.handle) {
-                ESP_LOGE(EXAMPLE_TAG, "Motor Model");
+            if(gatt_db_handle_table[IDX_CHAR_VAL_A] == param->read.handle) {
+                ESP_LOGE(EXAMPLE_TAG, "(2) ***** read char1 ***** ");
             }
-//            if(gatt_db_handle_table[IDX_CHAR_VAL_B] == param->read.handle) {
-//                ESP_LOGE(EXAMPLE_TAG, "(5) ***** read char2 ***** ");
-//            }
+            if(gatt_db_handle_table[IDX_CHAR_VAL_B] == param->read.handle) {
+                ESP_LOGE(EXAMPLE_TAG, "(5) ***** read char2 ***** ");
+            }
        	    break;
         case ESP_GATTS_WRITE_EVT:
-            if (!param->write.is_prep)//{
-//                // the data length of gattc write  must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
-//                if (gatt_db_handle_table[IDX_CHAR_CFG_C_2] == param->write.handle && param->write.len == 2){
-//                    uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
-//                    uint8_t notify_data[2];
-//                    notify_data[0] = 0xAA;
-//                    notify_data[1] = 0xBB;
-//
-//                    if (descr_value == 0x0001){
-//                        //the size of notify_data[] need less than MTU size
-//                        esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gatt_db_handle_table[IDX_CHAR_VAL_C],
-//                                                sizeof(notify_data), notify_data, false);
-//                        ESP_LOGI(EXAMPLE_TAG, "(6) ***** send notify AA BB ***** ");
-//                    }else if (descr_value == 0x0002){
-//                        //the size of indicate_data[] need less than MTU size
-//                        esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gatt_db_handle_table[IDX_CHAR_VAL_C],
-//                                            sizeof(notify_data), notify_data, true);
-//                    }
-//                    else if (descr_value == 0x0000){
-//                        ESP_LOGI(EXAMPLE_TAG, "notify/indicate disable ");
-//                    }else{
-//                        ESP_LOGE(EXAMPLE_TAG, "unknown descr value");
-//                        esp_log_buffer_hex(EXAMPLE_TAG, param->write.value, param->write.len);
-//                    }
-//
-//                }
-//                if(gatt_db_handle_table[IDX_CHAR_VAL_A] == param->write.handle && param->write.len == 2) {
-//                    uint8_t write_data[2] = {0x88, 0x99};
-//                    if(memcmp(write_data, param->write.value, param->write.len) == 0) {
-//                        ESP_LOGI(EXAMPLE_TAG, "(3)***** short write success ***** ");
-//                    }
-//                }
-//
-//                /* send response when param->write.need_rsp is true*/
-//                if (param->write.need_rsp){
-//                    esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
-//                }
-//            }else{
+            if (!param->write.is_prep){
+                // the data length of gattc write  must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
+                if (gatt_db_handle_table[IDX_CHAR_CFG_C_2] == param->write.handle && param->write.len == 2){
+                    uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
+                    uint8_t notify_data[2];
+                    notify_data[0] = 0xAA;
+                    notify_data[1] = 0xBB;
+
+                    if (descr_value == 0x0001){
+                        //the size of notify_data[] need less than MTU size
+                        esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gatt_db_handle_table[IDX_CHAR_VAL_C],
+                                                sizeof(notify_data), notify_data, false);
+                        ESP_LOGI(EXAMPLE_TAG, "(6) ***** send notify AA BB ***** ");
+                    }else if (descr_value == 0x0002){
+                        //the size of indicate_data[] need less than MTU size
+                        esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gatt_db_handle_table[IDX_CHAR_VAL_C],
+                                            sizeof(notify_data), notify_data, true);
+                    }
+                    else if (descr_value == 0x0000){
+                        ESP_LOGI(EXAMPLE_TAG, "notify/indicate disable ");
+                    }else{
+                        ESP_LOGE(EXAMPLE_TAG, "unknown descr value");
+                        esp_log_buffer_hex(EXAMPLE_TAG, param->write.value, param->write.len);
+                    }
+
+                }
+                if(gatt_db_handle_table[IDX_CHAR_VAL_A] == param->write.handle && param->write.len == 2) {
+                    uint8_t write_data[2] = {0x88, 0x99};
+                    if(memcmp(write_data, param->write.value, param->write.len) == 0) {
+                        ESP_LOGI(EXAMPLE_TAG, "(3)***** short write success ***** ");
+                    }
+                }
+
+                /* send response when param->write.need_rsp is true*/
+                if (param->write.need_rsp){
+                    esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
+                }
+            }else{
                 /* handle prepare write */
-//                example_prepare_write_event_env(gatts_if, &prepare_write_env, param);
-//            }
-            	asm("nop");
+                example_prepare_write_event_env(gatts_if, &prepare_write_env, param);
+            }
       	    break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             // the length of gattc prepare write data must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
@@ -594,14 +579,14 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             if (param->add_attr_tab.status != ESP_GATT_OK){
                 ESP_LOGE(EXAMPLE_TAG, "create attribute table failed, error code=0x%x", param->add_attr_tab.status);
             }
-            else if (param->add_attr_tab.num_handle != DATABASE_END){
+            else if (param->add_attr_tab.num_handle != HRS_IDX_NB){
                 ESP_LOGE(EXAMPLE_TAG, "create attribute table abnormally, num_handle (%d) \
-                        doesn't equal to HRS_IDX_NB(%d)", param->add_attr_tab.num_handle, DATABASE_END);
+                        doesn't equal to HRS_IDX_NB(%d)", param->add_attr_tab.num_handle, HRS_IDX_NB);
             }
             else {
                 ESP_LOGI(EXAMPLE_TAG, "create attribute table successfully, the number handle = %d",param->add_attr_tab.num_handle);
-                memcpy(gatt_db_handle_table_gate, param->add_attr_tab.handles, sizeof(gatt_db_handle_table_gate));
-                esp_ble_gatts_start_service(gatt_db_handle_table_gate[DATABASE_END]);
+                memcpy(gatt_db_handle_table, param->add_attr_tab.handles, sizeof(gatt_db_handle_table));
+                esp_ble_gatts_start_service(gatt_db_handle_table[IDX_SVC]);
             }
             break;
         }
@@ -609,7 +594,6 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             break;
     }
 }
-
 
 
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
