@@ -22,42 +22,19 @@
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_bt_main.h"
-#include "ble_compatibility_test.h"
+//#include "ble_compatibility_test.h"
 #include "esp_gatt_common_api.h"
 
-#define DEBUG_ON  0
-
-#if DEBUG_ON
-#define EXAMPLE_DEBUG ESP_LOGI
-#else
-#define EXAMPLE_DEBUG( tag, format, ... )
-#endif
-
-#define EXAMPLE_TAG "BLE_COMP"
-
-#define PROFILE_NUM                 1
-#define PROFILE_APP_IDX             0
-#define ESP_APP_ID                  0x55
-#define SAMPLE_DEVICE_NAME          "BLE_COMP_TEST"
-#define SVC_INST_ID                 0
-
-/* The max length of characteristic value. When the gatt client write or prepare write,
-*  the data length must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
-*/
-#define GATTS_EXAMPLE_CHAR_VAL_LEN_MAX 500
-#define LONG_CHAR_VAL_LEN           500
-#define SHORT_CHAR_VAL_LEN          10
-#define GATTS_NOTIFY_FIRST_PACKET_LEN_MAX 20
-
-#define PREPARE_BUF_MAX_SIZE        1024
-#define CHAR_DECLARATION_SIZE       (sizeof(uint8_t))
-
-#define ADV_CONFIG_FLAG             (1 << 0)
-#define SCAN_RSP_CONFIG_FLAG        (1 << 1)
+// costum header files
+#include "General_def.h"
+#include "UserCostumData.h"
+#include "database_ble.h"
 
 static uint8_t adv_config_done       = 0;
 
 uint16_t gatt_db_handle_table[HRS_IDX_NB];
+uint8_t gatt_db_value_table[HRS_IDX_NB];
+uint8_t *spiderman_db_value_table[HRS_IDX_NB][TOTAL_SIZE];
 
 typedef struct {
     uint8_t                 *prepare_buf;
@@ -153,38 +130,41 @@ struct gatts_profile_inst {
     esp_bt_uuid_t descr_uuid;
 };
 
-static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
-					esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+// non riesco a metterli in un altro file ? -->
+/*extern*/ /*static*/ const uint16_t GATTS_SERVICE_UUID_TEST      = 0x00FF;
+/*extern*/ /*static*/ const uint16_t CHAR_1_SHORT_WR              = 0xFF01;
+/*extern*/ /*static*/ const uint16_t CHAR_2_LONG_WR               = 0xFF02;
+/*extern*/ /*static*/ const uint16_t CHAR_3_SHORT_NOTIFY          = 0xFF03;
+/*      */ /*      */
+/*extern*/ /*static*/ const uint16_t primary_service_uuid         = ESP_GATT_UUID_PRI_SERVICE;
+/*extern*/ /*static*/ const uint16_t character_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
+/*extern*/ /*static*/ const uint16_t character_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
+/*extern*/ /*static*/ const uint16_t character_user_description   = ESP_GATT_UUID_CHAR_DESCRIPTION;
+/*extern*/ /*static*/ const uint8_t char_prop_notify              = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+/*extern*/ /*static*/ const uint8_t char_prop_read_write          = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ;
+/*extern*/ /*static*/ const uint8_t char1_name[]  = "Char_1_Short_WR";
+/*extern*/ /*static*/ const uint8_t char2_name[]  = "Char_2_Long_WR";
+/*extern*/ /*static*/ const uint8_t char3_name[]  = "Char_3_Short_Notify";
+/*extern*/ /*static*/ const uint8_t char_ccc[2]   = {0x00, 0x00};
+/*extern*/ /*static*/ const uint8_t char_value[4] = {0x11, 0x22, 0x33, 0x44};
 
-/* One gatt-based profile one app_id and one gatts_if, this array will store the gatts_if returned by ESP_GATTS_REG_EVT */
-static struct gatts_profile_inst heart_rate_profile_tab[PROFILE_NUM] = {
-    [PROFILE_APP_IDX] = {
-        .gatts_cb = gatts_profile_event_handler,
-        .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
-    },
+struct MotorDefault_struct{
+	char name[20];
+	uint8_t power;
+	uint16_t operating_hours;
+
+}  ;
+/*extern*/ struct MotorDefault_struct MotorDefault = {
+		.name = "Motordata",
+		.power = 15,
+		.operating_hours = 13,
 };
+/*extern*/ nvs_handle_t MotorFlash;
+/*extern*/ size_t required_size;
 
-/* Service */
-static const uint16_t GATTS_SERVICE_UUID_TEST      = 0x00FF;
-static const uint16_t CHAR_1_SHORT_WR              = 0xFF01;
-static const uint16_t CHAR_2_LONG_WR               = 0xFF02;
-static const uint16_t CHAR_3_SHORT_NOTIFY          = 0xFF03;
+uint8_t *charValAPointer;
 
-static const uint16_t primary_service_uuid         = ESP_GATT_UUID_PRI_SERVICE;
-static const uint16_t character_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
-static const uint16_t character_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-static const uint16_t character_user_description   = ESP_GATT_UUID_CHAR_DESCRIPTION;
-static const uint8_t char_prop_notify              = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-static const uint8_t char_prop_read_write          = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ;
-static const uint8_t char1_name[]  = "Char_1_Short_WR";
-static const uint8_t char2_name[]  = "Char_2_Long_WR";
-static const uint8_t char3_name[]  = "Char_3_Short_Notify";
-static const uint8_t char_ccc[2]   = {0x00, 0x00};
-static const uint8_t char_value[4] = {0x11, 0x22, 0x33, 0x44};
-
-
-/* Full Database Description - Used to add attributes into the database */
-static const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
+const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 {
     // Service Declaration
     [IDX_SVC]        =
@@ -198,13 +178,19 @@ static const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 
     /* Characteristic Value */
     [IDX_CHAR_VAL_A] =
+//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
+//      SHORT_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
     {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-      SHORT_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
+    		sizeof(((struct MotorDefault_struct*)0)->power),sizeof(((struct MotorDefault_struct*)0)->power),
+    					(uint8_t *)&(MotorDefault.power)}},
 
     /* Characteristic User Descriptor */
-    [IDX_CHAR_CFG_A]  =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-      sizeof(char1_name), sizeof(char1_name), (uint8_t *)char1_name}},
+//    [IDX_CHAR_CFG_A]  =
+//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+//      sizeof(char1_name), sizeof(char1_name), (uint8_t *)char1_name}},
+		[IDX_CHAR_CFG_A]  =
+		    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+		      sizeof(MotorDefault.name), sizeof(MotorDefault.name), (uint8_t *)MotorDefault.name}},
 
     /* Characteristic Declaration */
     [IDX_CHAR_B]      =
@@ -242,6 +228,38 @@ static const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
       sizeof(uint16_t), sizeof(char_ccc), (uint8_t *)char_ccc}},
 
 };
+
+// non riesco a metterli in un altro file ? -->
+
+static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
+					esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+
+/* One gatt-based profile one app_id and one gatts_if, this array will store the gatts_if returned by ESP_GATTS_REG_EVT */
+static struct gatts_profile_inst heart_rate_profile_tab[PROFILE_NUM] = {
+    [PROFILE_APP_IDX] = {
+        .gatts_cb = gatts_profile_event_handler,
+        .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
+    },
+};
+
+
+void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
+{
+	static uint16_t length = 1;
+	if (gatt_value_operation_act == READ_FROM_FLASH)
+	{
+
+	}
+	else if (gatt_value_operation_act == INIT_FROM_BLE_STACK)
+	{
+//		for (int var = 0; var < HRS_IDX_NB; ++var) {
+//			esp_ble_gatts_get_attr_value(gatt_db_handle_table[var],&length,gatt_db_value_table[var]);
+//		}
+
+	}
+	return;
+}
+
 
 static void show_bonded_devices(void)
 {
@@ -463,6 +481,10 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble
 
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
+	uint8_t length = 0;
+	uint8_t *prf_char;
+	uint8_t *prf_char_max[/*gatt_db[IDX_CHAR_CFG_A].att_desc.max_length*/1];
+
     switch (event) {
         case ESP_GATTS_REG_EVT:{
             esp_err_t set_dev_name_ret = esp_ble_gap_set_device_name(SAMPLE_DEVICE_NAME);
@@ -527,6 +549,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                         //the size of indicate_data[] need less than MTU size
                         esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gatt_db_handle_table[IDX_CHAR_VAL_C],
                                             sizeof(notify_data), notify_data, true);
+
                     }
                     else if (descr_value == 0x0000){
                         ESP_LOGI(EXAMPLE_TAG, "notify/indicate disable ");
@@ -551,6 +574,9 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 /* handle prepare write */
                 example_prepare_write_event_env(gatts_if, &prepare_write_env, param);
             }
+
+            esp_ble_gatts_get_attr_value(param->write.handle,  &length, &prf_char);
+//            MotorDefault.power = gatt_db[IDX_CHAR_VAL_A].att_desc.value[0];
       	    break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             // the length of gattc prepare write data must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
@@ -587,12 +613,34 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 ESP_LOGI(EXAMPLE_TAG, "create attribute table successfully, the number handle = %d",param->add_attr_tab.num_handle);
                 memcpy(gatt_db_handle_table, param->add_attr_tab.handles, sizeof(gatt_db_handle_table));
                 esp_ble_gatts_start_service(gatt_db_handle_table[IDX_SVC]);
+
+
+
+//            	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_VAL_A],  &length, &prf_char);
+////            	length = gatt_db[IDX_CHAR_CFG_A].att_desc.max_length-1;
+//            	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_CFG_A],  &length, &prf_char_max);
+//            	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_A],  &length, &prf_char);
+                for (int var = 0; var < HRS_IDX_NB; ++var) {
+                	esp_ble_gatts_get_attr_value(gatt_db_handle_table[var],  &spiderman_db_value_table[var][SIZE], &spiderman_db_value_table[var][VALUE]);
+				}
+                esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_A],  &length, &prf_char);
+
             }
             break;
         }
         default:
             break;
     }
+
+
+//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_VAL_A],  &length, &prf_char);
+//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_CFG_A],  &length, &prf_char_max);
+//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_A],  &length, &prf_char);
+//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_VAL_B],  &length, &prf_char);
+//    	gatt_db_value_table[IDX_CHAR_VAL_A] = *prf_char;
+
+//    gatt_db_update_data();
+
 }
 
 
@@ -623,6 +671,8 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
+
+
 void app_main(void)
 {
     esp_err_t ret;
@@ -634,6 +684,42 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK( ret );
+
+
+
+//    ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
+//
+//    	/*Non serve volendo*/
+//        if (ret != ESP_OK) {
+//            printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+//        } else {
+//            printf("Done\n");
+//        } /*Non serve volendo*/
+//
+//       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+//       ret = nvs_get_blob(MotorFlash, "nvs_struct", (void *)&MotorDefault, &required_size);
+//
+//       switch (ret) {
+//           case ESP_OK:
+//               printf("Done\n\n");
+//    //           printf("Buffer = %s\n\n", nvs_struct.buffer);
+//    //           printf("Number 1 = %d\n\n", nvs_struct.number1);
+//    //           printf("Number 2 = %d\n\n", nvs_struct.number2);
+//    //           printf("Character = %c\n\n", nvs_struct.character);
+//               break;
+//           case ESP_ERR_NVS_NOT_FOUND:
+//               printf("The value is not initialized yet!\n");
+//               required_size = sizeof(MotorDefault);
+//               memset(MotorDefault.name, 0, sizeof(MotorDefault.name));
+//               strcpy(MotorDefault.name,"Motor Data");
+//               MotorDefault.operating_hours = 14;
+//               MotorDefault.power = 130;
+//               break;
+//           default :
+//               printf("Error (%s) reading!\n", esp_err_to_name(ret));
+//
+//               gatt_db_value_table_manager(READ_FROM_FLASH);
+//       }
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
@@ -703,5 +789,9 @@ void app_main(void)
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+
+
+
+//    printf("Questo è il valore di motordefuatl %i: ",*charValAPointer);
 
 }

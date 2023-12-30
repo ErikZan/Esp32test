@@ -29,3 +29,18 @@ enum
 
     HRS_IDX_NB,
 };
+
+/* for */
+typedef enum
+{
+	READ_FROM_FLASH,
+	WRITE_TO_FLASH,
+	INIT_FROM_BLE_STACK,
+} gatt_value_operation;
+
+enum
+{
+	VALUE,
+	SIZE,
+	TOTAL_SIZE,
+};
