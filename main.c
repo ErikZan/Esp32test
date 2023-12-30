@@ -149,20 +149,31 @@ struct gatts_profile_inst {
 /*extern*/ /*static*/ const uint8_t char_value[4] = {0x11, 0x22, 0x33, 0x44};
 
 struct MotorDefault_struct{
-	char name[20];
+	char name[5];
 	uint8_t power;
 	uint16_t operating_hours;
 
 }  ;
-/*extern*/ struct MotorDefault_struct MotorDefault = {
+/*extern*/ struct MotorDefault_struct MotorDefault/**= {
 		.name = "Motordata",
 		.power = 15,
 		.operating_hours = 13,
-};
-/*extern*/ nvs_handle_t MotorFlash;
-/*extern*/ size_t required_size;
+}*/;
 
-uint8_t *charValAPointer;
+struct MotorDefault2_struct{
+	uint8_t power;
+	uint16_t operating_hours;
+
+}  ;
+/*extern*/ struct MotorDefault2_struct MotorDefault2/**= {
+		.name = "Motordata",
+		.power = 15,
+		.operating_hours = 13,
+}*/;
+
+/*extern*/ nvs_handle_t MotorFlash;
+nvs_handle MotorFlash2;
+/*extern*/ size_t required_size;
 
 const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 {
@@ -245,6 +256,7 @@ static struct gatts_profile_inst heart_rate_profile_tab[PROFILE_NUM] = {
 
 void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
 {
+	uint8_t err;
 	static uint16_t length = 1;
 	if (gatt_value_operation_act == READ_FROM_FLASH)
 	{
@@ -257,6 +269,17 @@ void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
 //		}
 
 	}
+	else if (gatt_value_operation_act == UPDATE_FROM_WRITE)
+	{
+		MotorDefault.power = *spiderman_db_value_table[IDX_CHAR_VAL_A][VALUE];
+		err = nvs_commit(MotorFlash);
+		if(err != ESP_OK)
+		{
+			asm("nop");
+		}
+
+	}
+
 	return;
 }
 
@@ -574,9 +597,10 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 /* handle prepare write */
                 example_prepare_write_event_env(gatts_if, &prepare_write_env, param);
             }
-
-            esp_ble_gatts_get_attr_value(param->write.handle,  &length, &prf_char);
+//            esp_ble_gatts_get_attr_value(param->write.handle,  &length, &prf_char);
 //            MotorDefault.power = gatt_db[IDX_CHAR_VAL_A].att_desc.value[0];
+            gatt_db_value_table_manager(UPDATE_FROM_WRITE);
+
       	    break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             // the length of gattc prepare write data must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
@@ -614,16 +638,13 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 memcpy(gatt_db_handle_table, param->add_attr_tab.handles, sizeof(gatt_db_handle_table));
                 esp_ble_gatts_start_service(gatt_db_handle_table[IDX_SVC]);
 
-
-
-//            	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_VAL_A],  &length, &prf_char);
-////            	length = gatt_db[IDX_CHAR_CFG_A].att_desc.max_length-1;
 //            	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_CFG_A],  &length, &prf_char_max);
-//            	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_A],  &length, &prf_char);
+
+                /*Initialization of spiderman_db_value_table, local variable that contains a key-value copy of the gatt_db
+                 * Must call it immidiately after esp_ble_gatts_start_service*/
                 for (int var = 0; var < HRS_IDX_NB; ++var) {
                 	esp_ble_gatts_get_attr_value(gatt_db_handle_table[var],  &spiderman_db_value_table[var][SIZE], &spiderman_db_value_table[var][VALUE]);
 				}
-                esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_A],  &length, &prf_char);
 
             }
             break;
@@ -676,7 +697,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 void app_main(void)
 {
     esp_err_t ret;
-
+    size_t require_size = sizeof(MotorDefault2);
     /* Initialize NVS. */
     ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -687,39 +708,38 @@ void app_main(void)
 
 
 
-//    ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
+    ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
 //
-//    	/*Non serve volendo*/
-//        if (ret != ESP_OK) {
-//            printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
-//        } else {
-//            printf("Done\n");
-//        } /*Non serve volendo*/
+    	/*Non serve volendo*/
+        if (ret != ESP_OK) {
+            printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+        } else {
+            printf("Done\n");
+        } /*Non serve volendo*/
+
+       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+       ret = nvs_get_blob(MotorFlash, "nvs_struct", (void *)&MotorDefault2, &require_size);
 //
-//       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
-//       ret = nvs_get_blob(MotorFlash, "nvs_struct", (void *)&MotorDefault, &required_size);
-//
-//       switch (ret) {
-//           case ESP_OK:
-//               printf("Done\n\n");
-//    //           printf("Buffer = %s\n\n", nvs_struct.buffer);
-//    //           printf("Number 1 = %d\n\n", nvs_struct.number1);
-//    //           printf("Number 2 = %d\n\n", nvs_struct.number2);
-//    //           printf("Character = %c\n\n", nvs_struct.character);
-//               break;
-//           case ESP_ERR_NVS_NOT_FOUND:
-//               printf("The value is not initialized yet!\n");
-//               required_size = sizeof(MotorDefault);
-//               memset(MotorDefault.name, 0, sizeof(MotorDefault.name));
-//               strcpy(MotorDefault.name,"Motor Data");
-//               MotorDefault.operating_hours = 14;
-//               MotorDefault.power = 130;
-//               break;
-//           default :
-//               printf("Error (%s) reading!\n", esp_err_to_name(ret));
-//
-//               gatt_db_value_table_manager(READ_FROM_FLASH);
-//       }
+       switch (ret) {
+           case ESP_OK:
+               printf("Done\n\n");
+    //           printf("Buffer = %s\n\n", nvs_struct.buffer);
+    //           printf("Number 1 = %d\n\n", nvs_struct.number1);
+    //           printf("Number 2 = %d\n\n", nvs_struct.number2);
+    //           printf("Character = %c\n\n", nvs_struct.character);
+               break;
+           case ESP_ERR_NVS_NOT_FOUND:
+               printf("The value is not initialized yet!\n");
+               required_size = sizeof(MotorDefault);
+               memset(MotorDefault.name, 0, sizeof(MotorDefault.name));
+               strcpy(MotorDefault.name,"Motor");
+               MotorDefault.operating_hours = 14;
+               MotorDefault.power = 130;
+               break;
+           default :
+               printf("Error (%s) reading!\n", esp_err_to_name(ret));
+
+       }
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
@@ -789,9 +809,5 @@ void app_main(void)
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-
-
-
-//    printf("Questo è il valore di motordefuatl %i: ",*charValAPointer);
 
 }

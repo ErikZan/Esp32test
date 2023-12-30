@@ -36,6 +36,7 @@ typedef enum
 	READ_FROM_FLASH,
 	WRITE_TO_FLASH,
 	INIT_FROM_BLE_STACK,
+	UPDATE_FROM_WRITE,
 } gatt_value_operation;
 
 enum
