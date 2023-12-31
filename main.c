@@ -25,6 +25,10 @@
 //#include "ble_compatibility_test.h"
 #include "esp_gatt_common_api.h"
 
+// wifi
+#include "esp_wifi.h"
+#include "esp_event.h"
+
 // costum header files
 #include "General_def.h"
 #include "UserCostumData.h"
@@ -154,18 +158,18 @@ struct MotorDefault_struct{
 	uint16_t operating_hours;
 
 }  ;
-/*extern*/ struct MotorDefault_struct MotorDefault/**= {
+/*extern*/ struct MotorDefault_struct MotorDefault= {
 		.name = "Motordata",
 		.power = 15,
 		.operating_hours = 13,
-}*/;
+};
 
 struct MotorDefault2_struct{
 	uint8_t power;
 	uint16_t operating_hours;
 
 }  ;
-/*extern*/ struct MotorDefault2_struct MotorDefault2/**= {
+/*extern*/ struct MotorDefault_struct MotorDefault2/**= {
 		.name = "Motordata",
 		.power = 15,
 		.operating_hours = 13,
@@ -174,6 +178,9 @@ struct MotorDefault2_struct{
 /*extern*/ nvs_handle_t MotorFlash;
 nvs_handle MotorFlash2;
 /*extern*/ size_t required_size;
+
+esp_err_t global_error_esp_dbg;
+size_t global_req_size;
 
 const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 {
@@ -277,6 +284,8 @@ void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
 		{
 			asm("nop");
 		}
+//		nvs_close(MotorFlash);
+		// debug ()
 
 	}
 
@@ -600,6 +609,16 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
 //            esp_ble_gatts_get_attr_value(param->write.handle,  &length, &prf_char);
 //            MotorDefault.power = gatt_db[IDX_CHAR_VAL_A].att_desc.value[0];
             gatt_db_value_table_manager(UPDATE_FROM_WRITE);
+            // debug ()
+            if (MotorDefault.power == 0xFF){
+            	esp_restart();
+            }
+            if (*param->write.value == 0xEE){
+            	global_req_size = sizeof(MotorDefault2);
+            	global_error_esp_dbg = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault2, &global_req_size);
+            	asm("nop");
+            }
+            // debug ()
 
       	    break;
         case ESP_GATTS_EXEC_WRITE_EVT:
@@ -691,13 +710,145 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
         }
     } while (0);
 }
+//
+//void wifi_scan() {
+//    wifi_scan_config_t scan_config = {
+//        .ssid = 0,
+//        .bssid = 0,
+//        .channel = 0,
+//        .show_hidden = true
+//    };
+//
+//    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
+//    printf("Scanning...\n");
+//
+//    uint16_t ap_num = 0;
+//    wifi_ap_record_t *ap_records;
+//
+//    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
+//    ap_records = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * ap_num);
+//    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, ap_records));
+//
+//    printf("Found %d networks\n", ap_num);
+//    for (int i = 0; i < ap_num; i++) {
+//        printf("SSID: %s, RSSI: %d\n", ap_records[i].ssid, ap_records[i].rssi);
+//        // Salva gli SSID in un array o fa qualsiasi altra elaborazione
+//    }
+//
+//    free(ap_records);
+//}
+//
+//static esp_err_t event_handler(void *ctx, system_event_t *event) {
+//    return ESP_OK;
+//}
+//
+//void wifi_init_sta() {
+//    tcpip_adapter_init();
+//    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
+//
+//    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+//    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+//    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+//
+//    wifi_config_t wifi_config = {
+//        .sta = {
+//            .ssid = "YOUR_SSID",
+//            .password = "YOUR_PASSWORD",
+//        },
+//    };
+//
+//    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+//    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+//    ESP_ERROR_CHECK(esp_wifi_start());
+//}
 
+
+static void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
+{
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        esp_wifi_connect();
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+    }
+}
+
+
+/* Initialize Wi-Fi as sta and set scan method */
+static void fast_scan(void)
+{
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
+
+    // Initialize default station as network interface instance (esp-netif)
+    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
+    assert(sta_netif);
+
+    // Initialize and start WiFi
+    wifi_config_t wifi_config = {
+        .sta = {
+            .ssid = DEFAULT_SSID,
+            .password = DEFAULT_PWD,
+            .scan_method = DEFAULT_SCAN_METHOD,
+            .sort_method = DEFAULT_SORT_METHOD,
+            .threshold.rssi = DEFAULT_RSSI,
+            .threshold.authmode = DEFAULT_AUTHMODE,
+        },
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
+}
+
+/* Initialize Wi-Fi as sta and set scan method */
+static void wifi_scan(void)
+{
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
+    assert(sta_netif);
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
+    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+    uint16_t ap_count = 0;
+    memset(ap_info, 0, sizeof(ap_info));
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    esp_wifi_scan_start(NULL, true);
+    ESP_LOGI(TAG, "Max AP number ap_info can hold = %u", number);
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_LOGI(TAG, "Total APs scanned = %u, actual AP number ap_info holds = %u", ap_count, number);
+    for (int i = 0; i < number; i++) {
+        ESP_LOGI(TAG, "SSID \t\t%s", ap_info[i].ssid);
+        ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
+//        print_auth_mode(ap_info[i].authmode); // stampa roba che al momento non mi serve
+//        if (ap_info[i].authmode != WIFI_AUTH_WEP) {
+//            print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
+//        }
+        ESP_LOGI(TAG, "Channel \t\t%d", ap_info[i].primary);
+    }
+
+}
 
 
 void app_main(void)
 {
     esp_err_t ret;
-    size_t require_size = sizeof(MotorDefault2);
+    size_t require_size = sizeof(MotorDefault);
     /* Initialize NVS. */
     ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -717,8 +868,9 @@ void app_main(void)
             printf("Done\n");
         } /*Non serve volendo*/
 
-       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
-       ret = nvs_get_blob(MotorFlash, "nvs_struct", (void *)&MotorDefault2, &require_size);
+//       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+
+       ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
 //
        switch (ret) {
            case ESP_OK:
@@ -727,6 +879,7 @@ void app_main(void)
     //           printf("Number 1 = %d\n\n", nvs_struct.number1);
     //           printf("Number 2 = %d\n\n", nvs_struct.number2);
     //           printf("Character = %c\n\n", nvs_struct.character);
+               asm("nop");
                break;
            case ESP_ERR_NVS_NOT_FOUND:
                printf("The value is not initialized yet!\n");
@@ -736,10 +889,23 @@ void app_main(void)
                MotorDefault.operating_hours = 14;
                MotorDefault.power = 130;
                break;
+           case ESP_ERR_NVS_KEY_TOO_LONG:
+        	   ret = nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
+        	   ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+        	   ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
+
+        	   if (ret != ESP_OK) {
+				   printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+			   } else {
+				   printf("Done\n");
+			   }
+           break;
            default :
                printf("Error (%s) reading!\n", esp_err_to_name(ret));
 
        }
+//       fast_scan();
+       wifi_scan();
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
