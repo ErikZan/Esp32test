@@ -11,6 +11,7 @@
 #include "General_def.h"
 #include "UserCostumData.h"
 #include "database_ble.h"
+#include "Wifi_common.h"
 
 
 const uint16_t GATTS_SERVICE_UUID_TEST      = 0x00FF;
@@ -59,19 +60,19 @@ const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 	  // WIFI SSID to show -->
 
 	  /* Characteristic Declaration */
-//	 [IDX_CHAR_WIFI_LIST]     =
-//	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-//	   CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
-//
-//	  /* Characteristic Value */
-//	  [IDX_CHAR_VAL_WIFI_LIST] =
-//	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_2_LONG_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-//		sizeof(),sizeof(),(uint8_t *)}},
-//
-//	  /* Characteristic User Descriptor */
-//     [IDX_CHAR_CFG_WIFI_LIST]  =
-//	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-//	  sizeof(), sizeof(), (uint8_t *)}},
+	 [IDX_CHAR_WIFI_LIST]     =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+	   CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
+
+	  /* Characteristic Value */
+	  [IDX_CHAR_VAL_WIFI_LIST] =
+	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_2_LONG_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
+		sizeof(ap_info),sizeof(ap_info),(uint8_t *)&ap_info}},
+
+	  /* Characteristic User Descriptor */
+     [IDX_CHAR_CFG_WIFI_LIST]  =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+			 sizeof(MotorDefault.name), sizeof(MotorDefault.name), (uint8_t *)MotorDefault.name}},
 
 	  // WIFI SSID to show -->
 

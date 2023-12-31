@@ -35,6 +35,7 @@
 
 
 // variabili
+extern wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
 
 // funzioni
 extern void wifi_scan(void);

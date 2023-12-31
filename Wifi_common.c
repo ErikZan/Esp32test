@@ -30,7 +30,9 @@
 #include "devices_manager.h"
 #include "Wifi_common.h"
 
-
+// variabili
+wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+// funzioni
 
 //void wifi_scan() {
 //    wifi_scan_config_t scan_config = {
@@ -143,7 +145,7 @@ void wifi_scan(void)
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     uint16_t number = DEFAULT_SCAN_LIST_SIZE;
-    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+
     uint16_t ap_count = 0;
     memset(ap_info, 0, sizeof(ap_info));
 
