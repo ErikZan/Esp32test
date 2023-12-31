@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef MAIN_BLE_COMPATIBILITY_H_
+#define MAIN_BLE_COMPATIBILITY_H_
 
 /* Attributes State Machine */
 enum
@@ -17,6 +19,10 @@ enum
     IDX_CHAR_A,
     IDX_CHAR_VAL_A,
     IDX_CHAR_CFG_A,
+
+	IDX_CHAR_WIFI_LIST,
+	IDX_CHAR_VAL_WIFI_LIST,
+	IDX_CHAR_CFG_WIFI_LIST,
 
     IDX_CHAR_B,
     IDX_CHAR_VAL_B,
@@ -45,3 +51,4 @@ enum
 	SIZE,
 	TOTAL_SIZE,
 };
+#endif /*MAIN_BLE_COMPATIBILITY_H_*/

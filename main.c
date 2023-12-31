@@ -30,15 +30,16 @@
 #include "esp_event.h"
 
 // costum header files
+#include "database_ble.h"
 #include "General_def.h"
 #include "UserCostumData.h"
-#include "database_ble.h"
+#include "devices_manager.h"
+#include "Wifi_common.h"
 
 static uint8_t adv_config_done       = 0;
 
 uint16_t gatt_db_handle_table[HRS_IDX_NB];
-uint8_t gatt_db_value_table[HRS_IDX_NB];
-uint8_t *spiderman_db_value_table[HRS_IDX_NB][TOTAL_SIZE];
+
 
 typedef struct {
     uint8_t                 *prepare_buf;
@@ -134,120 +135,14 @@ struct gatts_profile_inst {
     esp_bt_uuid_t descr_uuid;
 };
 
-// non riesco a metterli in un altro file ? -->
-/*extern*/ /*static*/ const uint16_t GATTS_SERVICE_UUID_TEST      = 0x00FF;
-/*extern*/ /*static*/ const uint16_t CHAR_1_SHORT_WR              = 0xFF01;
-/*extern*/ /*static*/ const uint16_t CHAR_2_LONG_WR               = 0xFF02;
-/*extern*/ /*static*/ const uint16_t CHAR_3_SHORT_NOTIFY          = 0xFF03;
-/*      */ /*      */
-/*extern*/ /*static*/ const uint16_t primary_service_uuid         = ESP_GATT_UUID_PRI_SERVICE;
-/*extern*/ /*static*/ const uint16_t character_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
-/*extern*/ /*static*/ const uint16_t character_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-/*extern*/ /*static*/ const uint16_t character_user_description   = ESP_GATT_UUID_CHAR_DESCRIPTION;
-/*extern*/ /*static*/ const uint8_t char_prop_notify              = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-/*extern*/ /*static*/ const uint8_t char_prop_read_write          = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ;
-/*extern*/ /*static*/ const uint8_t char1_name[]  = "Char_1_Short_WR";
-/*extern*/ /*static*/ const uint8_t char2_name[]  = "Char_2_Long_WR";
-/*extern*/ /*static*/ const uint8_t char3_name[]  = "Char_3_Short_Notify";
-/*extern*/ /*static*/ const uint8_t char_ccc[2]   = {0x00, 0x00};
-/*extern*/ /*static*/ const uint8_t char_value[4] = {0x11, 0x22, 0x33, 0x44};
+// variabili _-->
 
-struct MotorDefault_struct{
-	char name[5];
-	uint8_t power;
-	uint16_t operating_hours;
-
-}  ;
-/*extern*/ struct MotorDefault_struct MotorDefault= {
-		.name = "Motordata",
-		.power = 15,
-		.operating_hours = 13,
-};
-
-struct MotorDefault2_struct{
-	uint8_t power;
-	uint16_t operating_hours;
-
-}  ;
-/*extern*/ struct MotorDefault_struct MotorDefault2/**= {
-		.name = "Motordata",
-		.power = 15,
-		.operating_hours = 13,
-}*/;
-
-/*extern*/ nvs_handle_t MotorFlash;
-nvs_handle MotorFlash2;
-/*extern*/ size_t required_size;
-
+size_t required_size;
 esp_err_t global_error_esp_dbg;
 size_t global_req_size;
 
-const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
-{
-    // Service Declaration
-    [IDX_SVC]        =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid, ESP_GATT_PERM_READ,
-      sizeof(uint16_t), sizeof(GATTS_SERVICE_UUID_TEST), (uint8_t *)&GATTS_SERVICE_UUID_TEST}},
 
-    /* Characteristic Declaration */
-    [IDX_CHAR_A]     =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
 
-    /* Characteristic Value */
-    [IDX_CHAR_VAL_A] =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-//      SHORT_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_1_SHORT_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-    		sizeof(((struct MotorDefault_struct*)0)->power),sizeof(((struct MotorDefault_struct*)0)->power),
-    					(uint8_t *)&(MotorDefault.power)}},
-
-    /* Characteristic User Descriptor */
-//    [IDX_CHAR_CFG_A]  =
-//    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-//      sizeof(char1_name), sizeof(char1_name), (uint8_t *)char1_name}},
-		[IDX_CHAR_CFG_A]  =
-		    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-		      sizeof(MotorDefault.name), sizeof(MotorDefault.name), (uint8_t *)MotorDefault.name}},
-
-    /* Characteristic Declaration */
-    [IDX_CHAR_B]      =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
-
-    /* Characteristic Value */
-    [IDX_CHAR_VAL_B]  =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_2_LONG_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-      LONG_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
-
-       /* Characteristic User Descriptor */
-    [IDX_CHAR_CFG_B]  =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-      sizeof(char2_name), sizeof(char2_name), (uint8_t *)char2_name}},
-
-   /* Characteristic Declaration */
-    [IDX_CHAR_C]      =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_notify}},
-
-    /* Characteristic Value */
-    [IDX_CHAR_VAL_C]  =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_3_SHORT_NOTIFY, 0,
-      LONG_CHAR_VAL_LEN, sizeof(char_value), (uint8_t *)char_value}},
-
-    /* Characteristic User Descriptor */
-    [IDX_CHAR_CFG_C]  =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-      sizeof(char3_name), sizeof(char3_name), (uint8_t *)char3_name}},
-
-    /* Characteristic Client Configuration Descriptor */
-    [IDX_CHAR_CFG_C_2]  =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-      sizeof(uint16_t), sizeof(char_ccc), (uint8_t *)char_ccc}},
-
-};
-
-// non riesco a metterli in un altro file ? -->
 
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
 					esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
@@ -261,76 +156,8 @@ static struct gatts_profile_inst heart_rate_profile_tab[PROFILE_NUM] = {
 };
 
 
-void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
-{
-	uint8_t err;
-	static uint16_t length = 1;
-	if (gatt_value_operation_act == READ_FROM_FLASH)
-	{
-
-	}
-	else if (gatt_value_operation_act == INIT_FROM_BLE_STACK)
-	{
-//		for (int var = 0; var < HRS_IDX_NB; ++var) {
-//			esp_ble_gatts_get_attr_value(gatt_db_handle_table[var],&length,gatt_db_value_table[var]);
-//		}
-
-	}
-	else if (gatt_value_operation_act == UPDATE_FROM_WRITE)
-	{
-		MotorDefault.power = *spiderman_db_value_table[IDX_CHAR_VAL_A][VALUE];
-		err = nvs_commit(MotorFlash);
-		if(err != ESP_OK)
-		{
-			asm("nop");
-		}
-//		nvs_close(MotorFlash);
-		// debug ()
-
-	}
-
-	return;
-}
 
 
-static void show_bonded_devices(void)
-{
-    int dev_num = esp_ble_get_bond_device_num();
-
-    esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
-    if (!dev_list) {
-        ESP_LOGE(EXAMPLE_TAG, "malloc failed, return\n");
-        return;
-    }
-    esp_ble_get_bond_device_list(&dev_num, dev_list);
-    EXAMPLE_DEBUG(EXAMPLE_TAG, "Bonded devices number : %d\n", dev_num);
-
-    EXAMPLE_DEBUG(EXAMPLE_TAG, "Bonded devices list : %d\n", dev_num);
-    for (int i = 0; i < dev_num; i++) {
-        #if DEBUG_ON
-        esp_log_buffer_hex(EXAMPLE_TAG, (void *)dev_list[i].bd_addr, sizeof(esp_bd_addr_t));
-        #endif
-    }
-
-    free(dev_list);
-}
-
-static void __attribute__((unused)) remove_all_bonded_devices(void)
-{
-    int dev_num = esp_ble_get_bond_device_num();
-
-    esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
-    if (!dev_list) {
-        ESP_LOGE(EXAMPLE_TAG, "malloc failed, return\n");
-        return;
-    }
-    esp_ble_get_bond_device_list(&dev_num, dev_list);
-    for (int i = 0; i < dev_num; i++) {
-        esp_ble_remove_bond_device(dev_list[i].bd_addr);
-    }
-
-    free(dev_list);
-}
 
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
@@ -513,9 +340,6 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble
 
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
-	uint8_t length = 0;
-	uint8_t *prf_char;
-	uint8_t *prf_char_max[/*gatt_db[IDX_CHAR_CFG_A].att_desc.max_length*/1];
 
     switch (event) {
         case ESP_GATTS_REG_EVT:{
@@ -606,8 +430,6 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 /* handle prepare write */
                 example_prepare_write_event_env(gatts_if, &prepare_write_env, param);
             }
-//            esp_ble_gatts_get_attr_value(param->write.handle,  &length, &prf_char);
-//            MotorDefault.power = gatt_db[IDX_CHAR_VAL_A].att_desc.value[0];
             gatt_db_value_table_manager(UPDATE_FROM_WRITE);
             // debug ()
             if (MotorDefault.power == 0xFF){
@@ -671,16 +493,6 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
         default:
             break;
     }
-
-
-//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_VAL_A],  &length, &prf_char);
-//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_CFG_A],  &length, &prf_char_max);
-//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_A],  &length, &prf_char);
-//    	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_VAL_B],  &length, &prf_char);
-//    	gatt_db_value_table[IDX_CHAR_VAL_A] = *prf_char;
-
-//    gatt_db_update_data();
-
 }
 
 
@@ -711,201 +523,68 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 //
-//void wifi_scan() {
-//    wifi_scan_config_t scan_config = {
-//        .ssid = 0,
-//        .bssid = 0,
-//        .channel = 0,
-//        .show_hidden = true
-//    };
-//
-//    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-//    printf("Scanning...\n");
-//
-//    uint16_t ap_num = 0;
-//    wifi_ap_record_t *ap_records;
-//
-//    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
-//    ap_records = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * ap_num);
-//    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, ap_records));
-//
-//    printf("Found %d networks\n", ap_num);
-//    for (int i = 0; i < ap_num; i++) {
-//        printf("SSID: %s, RSSI: %d\n", ap_records[i].ssid, ap_records[i].rssi);
-//        // Salva gli SSID in un array o fa qualsiasi altra elaborazione
-//    }
-//
-//    free(ap_records);
-//}
-//
-//static esp_err_t event_handler(void *ctx, system_event_t *event) {
-//    return ESP_OK;
-//}
-//
-//void wifi_init_sta() {
-//    tcpip_adapter_init();
-//    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
-//
-//    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-//    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-//    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-//
-//    wifi_config_t wifi_config = {
-//        .sta = {
-//            .ssid = "YOUR_SSID",
-//            .password = "YOUR_PASSWORD",
-//        },
-//    };
-//
-//    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-//    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-//    ESP_ERROR_CHECK(esp_wifi_start());
-//}
 
-
-static void event_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        esp_wifi_connect();
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
-    }
-}
-
-
-/* Initialize Wi-Fi as sta and set scan method */
-static void fast_scan(void)
-{
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
-
-    // Initialize default station as network interface instance (esp-netif)
-    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-    assert(sta_netif);
-
-    // Initialize and start WiFi
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = DEFAULT_SSID,
-            .password = DEFAULT_PWD,
-            .scan_method = DEFAULT_SCAN_METHOD,
-            .sort_method = DEFAULT_SORT_METHOD,
-            .threshold.rssi = DEFAULT_RSSI,
-            .threshold.authmode = DEFAULT_AUTHMODE,
-        },
-    };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-}
-
-/* Initialize Wi-Fi as sta and set scan method */
-static void wifi_scan(void)
-{
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-    assert(sta_netif);
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
-    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
-    uint16_t ap_count = 0;
-    memset(ap_info, 0, sizeof(ap_info));
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    esp_wifi_scan_start(NULL, true);
-    ESP_LOGI(TAG, "Max AP number ap_info can hold = %u", number);
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_LOGI(TAG, "Total APs scanned = %u, actual AP number ap_info holds = %u", ap_count, number);
-    for (int i = 0; i < number; i++) {
-        ESP_LOGI(TAG, "SSID \t\t%s", ap_info[i].ssid);
-        ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
-//        print_auth_mode(ap_info[i].authmode); // stampa roba che al momento non mi serve
-//        if (ap_info[i].authmode != WIFI_AUTH_WEP) {
-//            print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
-//        }
-        ESP_LOGI(TAG, "Channel \t\t%d", ap_info[i].primary);
-    }
-
-}
 
 
 void app_main(void)
 {
-    esp_err_t ret;
-    size_t require_size = sizeof(MotorDefault);
-    /* Initialize NVS. */
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( ret );
+	esp_err_t ret;
+	size_t require_size;
+	/* Initialize NVS. */
+	ret = nvs_flash_init();
+	if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
+		ESP_ERROR_CHECK(nvs_flash_erase());
+		ret = nvs_flash_init();
+	}
+	ESP_ERROR_CHECK( ret );
 
 
 
-    ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
-//
-    	/*Non serve volendo*/
-        if (ret != ESP_OK) {
-            printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
-        } else {
-            printf("Done\n");
-        } /*Non serve volendo*/
+	ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
+	//
+	/*Non serve volendo*/
+	if (ret != ESP_OK) {
+		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+	} else {
+		printf("Done\n");
+	} /*Non serve volendo*/
 
-//       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+	//       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size ); // serve ad assegnare la giusta required_size
+	require_size = sizeof(MotorDefault);
+	ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
+	//
+	switch (ret) {
+	case ESP_OK:
+		printf("Done\n\n");
+		printf("Buffer = %s\n\n", MotorDefault.name);
+		printf("Number 1 = %i\n\n", MotorDefault.power);
+		printf("Number 2 = %i\n\n", MotorDefault.operating_hours);
+		asm("nop");
+		break;
+	case ESP_ERR_NVS_NOT_FOUND:
+		printf("The value is not initialized yet!\n");
+		required_size = sizeof(MotorDefault);
+		memset(MotorDefault.name, 0, sizeof(MotorDefault.name));
+		strcpy(MotorDefault.name,"Motor");
+		MotorDefault.operating_hours = 14;
+		MotorDefault.power = 130;
+		break;
+	case ESP_ERR_NVS_KEY_TOO_LONG:
+		ret = nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
+		ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+		ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
 
-       ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
-//
-       switch (ret) {
-           case ESP_OK:
-               printf("Done\n\n");
-    //           printf("Buffer = %s\n\n", nvs_struct.buffer);
-    //           printf("Number 1 = %d\n\n", nvs_struct.number1);
-    //           printf("Number 2 = %d\n\n", nvs_struct.number2);
-    //           printf("Character = %c\n\n", nvs_struct.character);
-               asm("nop");
-               break;
-           case ESP_ERR_NVS_NOT_FOUND:
-               printf("The value is not initialized yet!\n");
-               required_size = sizeof(MotorDefault);
-               memset(MotorDefault.name, 0, sizeof(MotorDefault.name));
-               strcpy(MotorDefault.name,"Motor");
-               MotorDefault.operating_hours = 14;
-               MotorDefault.power = 130;
-               break;
-           case ESP_ERR_NVS_KEY_TOO_LONG:
-        	   ret = nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
-        	   ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
-        	   ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
+		if (ret != ESP_OK) {
+			printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+		} else {
+			printf("Done\n");
+		}
+		break;
+	default :
+		printf("Error (%s) reading!\n", esp_err_to_name(ret));
 
-        	   if (ret != ESP_OK) {
-				   printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
-			   } else {
-				   printf("Done\n");
-			   }
-           break;
-           default :
-               printf("Error (%s) reading!\n", esp_err_to_name(ret));
-
-       }
-//       fast_scan();
-       wifi_scan();
+	}
+	wifi_scan();
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
@@ -975,5 +654,6 @@ void app_main(void)
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+
 
 }

@@ -17,16 +17,15 @@
 #include "nvs_flash.h"
 //Adding Motor structure
 
-//struct MotorDefault_struct{
-//	char name[20];
-//	uint8_t power;
-//	uint16_t operating_hours;
-//
-//}  ;
-//extern struct MotorDefault_struct MotorDefault;
-//extern nvs_handle_t MotorFlash;
-//extern size_t required_size;
+struct MotorDefault_struct{
+	char name[20];
+	uint8_t power;
+	uint16_t operating_hours;
 
+}  ;
+
+extern struct MotorDefault_struct MotorDefault;
+extern struct MotorDefault_struct MotorDefault2;
 
 
 

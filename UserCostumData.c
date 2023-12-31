@@ -5,14 +5,10 @@
  *      Author: root
  */
 
-
+#include "UserCostumData.h"
+#include "General_def.h"
 
 /* Initialization */
-struct MotorDefault_struct MotorDefault ={
-		.name = "MotorName",
-		.power = 100,
-		.operating_hours = 5,
-};
-nvs_handle_t MotorFlash;
-size_t required_size = sizeof(MotorDefault);
+struct MotorDefault_struct MotorDefault;
+struct MotorDefault_struct MotorDefault2;
 

@@ -40,7 +40,7 @@
 
 
 // Wifi ------------------------------
-const char *TAG = "scan";
+//const char *TAG = "scan";
 /* Set the SSID and Password via project configuration, or can set directly here */
 #define DEFAULT_SSID "SSID_DEF"
 #define DEFAULT_PWD "1234567890"
@@ -81,5 +81,6 @@ const char *TAG = "scan";
 
 
 #define DEFAULT_SCAN_LIST_SIZE 10
+
 
 #endif /* MAIN_GENERAL_DEF_H_ */
