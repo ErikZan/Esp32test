@@ -27,6 +27,7 @@ extern uint8_t *spiderman_db_value_table[HRS_IDX_NB][TOTAL_SIZE];
 
 extern nvs_handle_t MotorFlash;
 extern nvs_handle MotorFlash2;
+extern nvs_handle_t WifiDataFlash;
 
 
 extern void show_bonded_devices(void);

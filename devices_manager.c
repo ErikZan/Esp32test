@@ -39,6 +39,7 @@ uint8_t *spiderman_db_value_table[HRS_IDX_NB][TOTAL_SIZE];
 // Variabili Eeeprom
 nvs_handle_t MotorFlash;
 nvs_handle MotorFlash2;
+nvs_handle_t WifiDataFlash;
 
 
 // ------------ Fuznioni --------------
@@ -100,13 +101,21 @@ void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
 	{
 		MotorDefault.power = *spiderman_db_value_table[IDX_CHAR_VAL_A][VALUE];
 
-		memcpy(wifi_config.sta.ssid,WifiSSIDList[*spiderman_db_value_table[IDX_CHAR_VAL_WIFI_SEL][VALUE]],sizeof(WifiSSIDList[*spiderman_db_value_table[IDX_CHAR_VAL_WIFI_SEL][VALUE]])-1);
-		// Copio password wifi
-//		for (int var = 0; var < sizeof(wifi_config.sta.password); ++var) {
-//			wifi_config.sta.password[var] = *spiderman_db_value_table[IDX_CHAR_VAL_WIFI_PSW][VALUE][var];
-//		}
-		memcpy(wifi_config.sta.password,spiderman_db_value_table[IDX_CHAR_VAL_WIFI_PSW][VALUE],sizeof(wifi_config.sta.password));
+		memcpy(wifi_config.sta.ssid,WifiSSIDList[*spiderman_db_value_table[IDX_CHAR_VAL_WIFI_SEL][VALUE]],sizeof(WifiSSIDList[*spiderman_db_value_table[IDX_CHAR_VAL_WIFI_SEL][VALUE]]));
 
+		// rimuovo la virgola --> vediamo se c'è un metodo più elòegante
+		for (int var = 0; var < 64; ++var) {
+			if (wifi_config.sta.ssid[var] == ',')
+			{
+				wifi_config.sta.ssid[var] = '\0';
+				break;
+			}
+		}
+
+		// Copio password wifi
+		memcpy(wifi_config.sta.password,spiderman_db_value_table[IDX_CHAR_VAL_WIFI_PSW][VALUE],sizeof(wifi_config.sta.password));
+		memcpy(Wifidataram[0],wifi_config.sta.ssid,sizeof(wifi_config.sta.ssid));
+		memcpy(Wifidataram[1],wifi_config.sta.password,sizeof(wifi_config.sta.password));
 
 
 		err = nvs_commit(MotorFlash);
@@ -114,6 +123,12 @@ void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
 		{
 			asm("nop");
 		}
+		err = nvs_commit(WifiDataFlash);
+				if(err != ESP_OK)
+				{
+					asm("nop");
+				}
+
 //		nvs_close(MotorFlash);
 		// debug ()
 

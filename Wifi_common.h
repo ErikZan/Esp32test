@@ -40,10 +40,12 @@ extern char WifiSSIDList[DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS][33+1];
 extern uint8_t Wifi_select;
 //extern char Wifi_password[64];
 extern wifi_config_t wifi_config;
+extern char Wifidataram[2][64];
 
 
 // funzioni
 extern void wifi_check_task(void *pvParameters);
 extern void wifi_scan(void);
+extern void wifi_init_sta(void);
 
 #endif /* MAIN_WIFI_COMMON_H_ */

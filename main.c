@@ -25,6 +25,8 @@
 //#include "ble_compatibility_test.h"
 #include "esp_gatt_common_api.h"
 
+//#include "tcpip_adapter.h"
+
 // wifi
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -447,6 +449,9 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             {
 
 
+            	    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA,&wifi_config));
+            	    ESP_ERROR_CHECK(esp_wifi_start());// starts wifi usage
+            	    ESP_ERROR_CHECK(esp_wifi_connect());
             }
             // Wif <--
 
@@ -548,6 +553,7 @@ void app_main(void)
 
 
 	ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
+	ret = nvs_open("storage", NVS_READWRITE, &WifiDataFlash);
 	//
 	/*Non serve volendo*/
 	if (ret != ESP_OK) {
@@ -591,6 +597,36 @@ void app_main(void)
 		printf("Error (%s) reading!\n", esp_err_to_name(ret));
 
 	}
+
+		require_size = sizeof(Wifidataram);
+		ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/&Wifidataram, &require_size);
+		//
+		switch (ret) {
+		case ESP_OK:
+			printf("Done\n\n");
+
+			asm("nop");
+			break;
+		case ESP_ERR_NVS_NOT_FOUND:
+			printf("The value is not initialized yet!\n");
+
+			break;
+		case ESP_ERR_NVS_KEY_TOO_LONG:
+//			ret = nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
+//			ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+//			ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
+
+			if (ret != ESP_OK) {
+				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+			} else {
+				printf("Done\n");
+			}
+			break;
+		default :
+			printf("Error (%s) reading!\n", esp_err_to_name(ret));
+
+		}
+
 	wifi_scan();
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
@@ -664,6 +700,12 @@ void app_main(void)
 
 
 //    wifi_connection();
+//    wifi_init_sta();
+//    tcpip_adapter_init();
+
+    wifi_init_config_t wifi_config_init = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wifi_config_init));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 
 
     // Task costum

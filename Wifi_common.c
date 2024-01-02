@@ -25,6 +25,9 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 
+#include "lwip/err.h"
+#include "lwip/sys.h"
+
 // costum header files
 #include "database_ble.h"
 #include "General_def.h"
@@ -48,7 +51,9 @@ uint8_t Wifi_select = 0;
         },
     };
 
+char Wifidataram[2][64];
 
+    // funzioni
 
 void wifi_check_task(void *pvParameters) {
     while (1) {
@@ -65,106 +70,6 @@ void wifi_check_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(WIFI_CHECK_INTERVAL));
     }
 }
-
-// funzioni
-
-//void wifi_scan() {
-//    wifi_scan_config_t scan_config = {
-//        .ssid = 0,
-//        .bssid = 0,
-//        .channel = 0,
-//        .show_hidden = true
-//    };
-//
-//    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-//    printf("Scanning...\n");
-//
-//    uint16_t ap_num = 0;
-//    wifi_ap_record_t *ap_records;
-//
-//    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
-//    ap_records = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * ap_num);
-//    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, ap_records));
-//
-//    printf("Found %d networks\n", ap_num);
-//    for (int i = 0; i < ap_num; i++) {
-//        printf("SSID: %s, RSSI: %d\n", ap_records[i].ssid, ap_records[i].rssi);
-//        // Salva gli SSID in un array o fa qualsiasi altra elaborazione
-//    }
-//
-//    free(ap_records);
-//}
-//
-//static esp_err_t event_handler(void *ctx, system_event_t *event) {
-//    return ESP_OK;
-//}
-//
-//void wifi_init_sta() {
-//    tcpip_adapter_init();
-//    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
-//
-//    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-//    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-//    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-//
-//    wifi_config_t wifi_config = {
-//        .sta = {
-//            .ssid = "YOUR_SSID",
-//            .password = "YOUR_PASSWORD",
-//        },
-//    };
-//
-//    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-//    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-//    ESP_ERROR_CHECK(esp_wifi_start());
-//}
-
-
-//static void event_handler(void* arg, esp_event_base_t event_base,
-//                                int32_t event_id, void* event_data)
-//{
-//    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-//        esp_wifi_connect();
-//    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-//        esp_wifi_connect();
-//    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-//        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-//        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
-//    }
-//}
-//
-//
-///* Initialize Wi-Fi as sta and set scan method */
-//static void fast_scan(void)
-//{
-//    ESP_ERROR_CHECK(esp_netif_init());
-//    ESP_ERROR_CHECK(esp_event_loop_create_default());
-//
-//    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-//    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-//
-//    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, NULL));
-//    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
-//
-//    // Initialize default station as network interface instance (esp-netif)
-//    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-//    assert(sta_netif);
-//
-//    // Initialize and start WiFi
-//    wifi_config_t wifi_config = {
-//        .sta = {
-//            .ssid = DEFAULT_SSID,
-//            .password = DEFAULT_PWD,
-//            .scan_method = DEFAULT_SCAN_METHOD,
-//            .sort_method = DEFAULT_SORT_METHOD,
-//            .threshold.rssi = DEFAULT_RSSI,
-//            .threshold.authmode = DEFAULT_AUTHMODE,
-//        },
-//    };
-//    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-//    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-//    ESP_ERROR_CHECK(esp_wifi_start());
-//}
 
 /* Initialize Wi-Fi as sta and set scan method */
 void wifi_scan(void)
@@ -215,5 +120,113 @@ void wifi_scan(void)
     }
 
 }
+
+
+
+
+
+/* The examples use WiFi configuration that you can set via project configuration menu
+
+   If you'd rather not, just change the below entries to strings with
+   the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
+*/
+
+#define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
+#define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
+#define EXAMPLE_ESP_MAXIMUM_RETRY  5
+
+/* FreeRTOS event group to signal when we are connected*/
+static EventGroupHandle_t s_wifi_event_group;
+
+/* The event group allows multiple bits for each event, but we only care about two events:
+ * - we are connected to the AP with an IP
+ * - we failed to connect after the maximum amount of retries */
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
+
+static const char *TAGwifi = "wifi station";
+
+static int s_retry_num = 0;
+
+static void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
+{
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY) {
+            esp_wifi_connect();
+            s_retry_num++;
+            ESP_LOGI(TAGwifi, "retry to connect to the AP");
+        } else {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        }
+        ESP_LOGI(TAGwifi,"connect to the AP fail");
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAGwifi, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        s_retry_num = 0;
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    }
+}
+
+void wifi_init_sta(void)
+{
+    s_wifi_event_group = xEventGroupCreate();
+
+    ESP_ERROR_CHECK(esp_netif_init());
+
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_create_default_wifi_sta();
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    ESP_ERROR_CHECK(esp_wifi_start() );
+
+    ESP_LOGI(TAGwifi, "wifi_init_sta finished.");
+
+    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
+     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE,
+            pdFALSE,
+            portMAX_DELAY);
+
+    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
+     * happened. */
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAGwifi, "connected to ap SSID:%s password:%s",
+                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGI(TAGwifi, "Failed to connect to SSID:%s, password:%s",
+                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+    } else {
+        ESP_LOGE(TAGwifi, "UNEXPECTED EVENT");
+    }
+
+    /* The event will not be processed after unregister */
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
+    vEventGroupDelete(s_wifi_event_group);
+}
+
+
 
 
