@@ -19,6 +19,10 @@ const uint16_t CHAR_1_SHORT_WR              = 0xFF01;
 const uint16_t CHAR_2_LONG_WR               = 0xFF02;
 const uint16_t CHAR_3_SHORT_NOTIFY          = 0xFF03;
 
+const uint16_t UUID_WIFI_LIST          		= 0xFF04;
+const uint16_t UUID_WIFI_PSW          		= 0xFF05;
+const uint16_t UUID_WIFI_SEL         		= 0xFF06;
+
 const uint16_t primary_service_uuid         = ESP_GATT_UUID_PRI_SERVICE;
 const uint16_t character_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
 const uint16_t character_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
@@ -31,6 +35,10 @@ const uint8_t char3_name[]  = "Char_3_Short_Notify";
 const uint8_t char_ccc[2]   = {0x00, 0x00};
 const uint8_t char_value[4] = {0x11, 0x22, 0x33, 0x44};
 
+// Label database
+const uint8_t wifi_list[] = "Wifi-list";
+const uint8_t wifi_selector[] = "Wifi-selector";
+const uint8_t wifi_password[] = "Wifi-password";
 
 /* Full Database Description - Used to add attributes into the database */
 
@@ -66,15 +74,56 @@ const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 
 	  /* Characteristic Value */
 	  [IDX_CHAR_VAL_WIFI_LIST] =
-	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&CHAR_2_LONG_WR, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
-		sizeof(ap_info),sizeof(ap_info),(uint8_t *)&ap_info}},
+	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&UUID_WIFI_LIST, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
+		sizeof(WifiSSIDList),sizeof(WifiSSIDList),(uint8_t *)WifiSSIDList}},
 
 	  /* Characteristic User Descriptor */
      [IDX_CHAR_CFG_WIFI_LIST]  =
 	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
-			 sizeof(MotorDefault.name), sizeof(MotorDefault.name), (uint8_t *)MotorDefault.name}},
+			 sizeof(wifi_list), sizeof(wifi_list), (uint8_t *)wifi_list}},
 
 	  // WIFI SSID to show -->
+
+	 // WIFI SSID Selection --> -->
+
+	  /* Characteristic Declaration */
+	 [IDX_CHAR_WIFI_SEL]     =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+	   CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
+
+	  /* Characteristic Value */
+	  [IDX_CHAR_VAL_WIFI_SEL] =
+	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&UUID_WIFI_SEL, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_PERM_READ_ENC_MITM,
+		sizeof(Wifi_select),sizeof(Wifi_select),(uint8_t *)&Wifi_select}},
+
+	  /* Characteristic User Descriptor */
+	 [IDX_CHAR_CFG_WIFI_SEL]  =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+			 sizeof(wifi_selector), sizeof(wifi_selector), (uint8_t *)wifi_selector}},
+
+	// WIFI SSID Selection -->
+
+	 // WIFI SSID Password --> -->
+
+	  /* Characteristic Declaration */
+	 [IDX_CHAR_WIFI_PSW]     =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+	   CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
+
+	  /* Characteristic Value */
+	  [IDX_CHAR_VAL_WIFI_PSW] =
+	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&UUID_WIFI_PSW, ESP_GATT_PERM_WRITE ,
+		sizeof(wifi_config.sta.password),sizeof(wifi_config.sta.password),(uint8_t *)wifi_config.sta.password}},
+
+	  /* Characteristic User Descriptor */
+	 [IDX_CHAR_CFG_WIFI_PSW]  =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+			 sizeof(wifi_password), sizeof(wifi_password), (uint8_t *)wifi_password}},
+
+	// WIFI SSID Password -->
+
+
+
 
     /* Characteristic Declaration */
     [IDX_CHAR_B]      =

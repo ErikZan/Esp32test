@@ -35,10 +35,15 @@
 
 
 // variabili
-extern wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+extern wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS];
+extern char WifiSSIDList[DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS][33+1];
+extern uint8_t Wifi_select;
+//extern char Wifi_password[64];
+extern wifi_config_t wifi_config;
+
 
 // funzioni
+extern void wifi_check_task(void *pvParameters);
 extern void wifi_scan(void);
-
 
 #endif /* MAIN_WIFI_COMMON_H_ */

@@ -81,6 +81,7 @@
 
 
 #define DEFAULT_SCAN_LIST_SIZE 10
+#define DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS 7
 
 
 #endif /* MAIN_GENERAL_DEF_H_ */

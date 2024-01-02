@@ -5,6 +5,8 @@
  *      Author: root
  */
 #include <inttypes.h>
+#include <string.h>
+#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -30,8 +32,40 @@
 #include "devices_manager.h"
 #include "Wifi_common.h"
 
+//costanti
+#define WIFI_CHECK_INTERVAL 5000 // Intervallo di controllo dello stato WiFi in millisecondi
+
 // variabili
-wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+wifi_ap_record_t ap_info[/*DEFAULT_SCAN_LIST_SIZE*/DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS]; // Potrei anche usare direttamente DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS
+char WifiSSIDList[DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS][33+1]; /// la dimensione massima scambiata è 251byte, la dimesnione di un wifi_ap_record_t.ssid è 33 e 251/33 --> 7 ssid trasmissibili
+uint8_t Wifi_select = 0;
+//char Wifi_password[64] = {};
+
+    wifi_config_t wifi_config = {
+        .sta = {
+            .ssid = "",
+            .password = "",
+        },
+    };
+
+
+
+void wifi_check_task(void *pvParameters) {
+    while (1) {
+        wifi_ap_record_t ap_info;
+        esp_err_t ret = esp_wifi_sta_get_ap_info(&ap_info);
+
+        if (ret == ESP_OK) {
+            printf("Stato connessione WiFi: Connesso\n");
+            printf("Segnale WiFi: %d dBm\n", ap_info.rssi);
+        } else {
+            printf("Stato connessione WiFi: Disconnesso\n");
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(WIFI_CHECK_INTERVAL));
+    }
+}
+
 // funzioni
 
 //void wifi_scan() {
@@ -136,6 +170,10 @@ wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
 void wifi_scan(void)
 {
 	const char *TAG = "scan";
+	uint8_t SSID_LENGTH = 33;
+	char string[SSID_LENGTH+1];
+	uint8_t q = 0;
+
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
@@ -144,7 +182,7 @@ void wifi_scan(void)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
+    uint16_t number = /*DEFAULT_SCAN_LIST_SIZE*/DEFAULT_SCAN_LIST_SIZE_for_BLE_5_TRANS;
 
     uint16_t ap_count = 0;
     memset(ap_info, 0, sizeof(ap_info));
@@ -159,6 +197,16 @@ void wifi_scan(void)
     for (int i = 0; i < number; i++) {
         ESP_LOGI(TAG, "SSID \t\t%s", ap_info[i].ssid);
         ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
+
+        for (q = 0; q < SSID_LENGTH; ++q) {
+               string[q] = (char)ap_info[i].ssid[q]; // "%02X" formatta il numero in due caratteri esadecimali
+               if (string[q] == '\0')
+            	   break;
+            }
+        string[q] = ',';
+        string[q+1] = '\0';
+
+        strcpy(WifiSSIDList[i],string);
 //        print_auth_mode(ap_info[i].authmode); // stampa roba che al momento non mi serve
 //        if (ap_info[i].authmode != WIFI_AUTH_WEP) {
 //            print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
@@ -167,3 +215,5 @@ void wifi_scan(void)
     }
 
 }
+
+

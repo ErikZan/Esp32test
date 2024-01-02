@@ -442,6 +442,14 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             }
             // debug ()
 
+            // Wifi -->
+            if (gatt_db_handle_table[IDX_CHAR_VAL_WIFI_PSW] == param->write.handle)
+            {
+
+
+            }
+            // Wif <--
+
       	    break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             // the length of gattc prepare write data must be less than GATTS_EXAMPLE_CHAR_VAL_LEN_MAX.
@@ -523,7 +531,6 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 //
-
 
 
 void app_main(void)
@@ -654,6 +661,14 @@ void app_main(void)
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+
+
+//    wifi_connection();
+
+
+    // Task costum
+    xTaskCreate(&wifi_check_task, "wifi_check_task", 4096, NULL, 5, NULL);
+
 
 
 }

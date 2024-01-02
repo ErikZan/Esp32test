@@ -29,6 +29,7 @@
 #include "General_def.h"
 #include "UserCostumData.h"
 #include "devices_manager.h"
+#include  "Wifi_common.h"
 
 
 // ------------ Variabili ------------
@@ -83,6 +84,7 @@ void __attribute__((unused)) remove_all_bonded_devices(void)
 void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
 {
 	uint8_t err;
+	char buffer[64];
 	if (gatt_value_operation_act == READ_FROM_FLASH)
 	{
 
@@ -97,6 +99,16 @@ void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act)
 	else if (gatt_value_operation_act == UPDATE_FROM_WRITE)
 	{
 		MotorDefault.power = *spiderman_db_value_table[IDX_CHAR_VAL_A][VALUE];
+
+		memcpy(wifi_config.sta.ssid,WifiSSIDList[*spiderman_db_value_table[IDX_CHAR_VAL_WIFI_SEL][VALUE]],sizeof(WifiSSIDList[*spiderman_db_value_table[IDX_CHAR_VAL_WIFI_SEL][VALUE]])-1);
+		// Copio password wifi
+//		for (int var = 0; var < sizeof(wifi_config.sta.password); ++var) {
+//			wifi_config.sta.password[var] = *spiderman_db_value_table[IDX_CHAR_VAL_WIFI_PSW][VALUE][var];
+//		}
+		memcpy(wifi_config.sta.password,spiderman_db_value_table[IDX_CHAR_VAL_WIFI_PSW][VALUE],sizeof(wifi_config.sta.password));
+
+
+
 		err = nvs_commit(MotorFlash);
 		if(err != ESP_OK)
 		{
