@@ -439,19 +439,25 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             }
             if (*param->write.value == 0xEE){
             	global_req_size = sizeof(MotorDefault2);
-            	global_error_esp_dbg = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault2, &global_req_size);
+            	nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
+            	nvs_commit(MotorFlash);
             	asm("nop");
             }
+
+
+
             // debug ()
 
             // Wifi -->
             if (gatt_db_handle_table[IDX_CHAR_VAL_WIFI_PSW] == param->write.handle)
             {
 
-
             	    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA,&wifi_config));
             	    ESP_ERROR_CHECK(esp_wifi_start());// starts wifi usage
-            	    ESP_ERROR_CHECK(esp_wifi_connect());
+            	    if (wifi_config.sta.password[0] != '\0')
+            	    	ESP_ERROR_CHECK(esp_wifi_connect());
+            	    else
+            	    	ESP_ERROR_CHECK(esp_wifi_disconnect());
             }
             // Wif <--
 
@@ -553,7 +559,7 @@ void app_main(void)
 
 
 	ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
-	ret = nvs_open("storage", NVS_READWRITE, &WifiDataFlash);
+	ret = nvs_open("storage2", NVS_READWRITE, &WifiDataFlash);
 	//
 	/*Non serve volendo*/
 	if (ret != ESP_OK) {
@@ -612,9 +618,9 @@ void app_main(void)
 
 			break;
 		case ESP_ERR_NVS_KEY_TOO_LONG:
-//			ret = nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
-//			ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
-//			ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
+			ret = nvs_set_blob(WifiDataFlash, "wifi_flash", &Wifidataram, sizeof (Wifidataram) );
+			ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/NULL, &require_size);;
+			ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/&Wifidataram, &require_size);;
 
 			if (ret != ESP_OK) {
 				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));

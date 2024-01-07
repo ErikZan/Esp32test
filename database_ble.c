@@ -12,6 +12,7 @@
 #include "UserCostumData.h"
 #include "database_ble.h"
 #include "Wifi_common.h"
+#include "Label.h"
 
 
 const uint16_t GATTS_SERVICE_UUID_TEST      = 0x00FF;
@@ -22,6 +23,8 @@ const uint16_t CHAR_3_SHORT_NOTIFY          = 0xFF03;
 const uint16_t UUID_WIFI_LIST          		= 0xFF04;
 const uint16_t UUID_WIFI_PSW          		= 0xFF05;
 const uint16_t UUID_WIFI_SEL         		= 0xFF06;
+
+const uint16_t UUID_TABLE_1					= 0xFFF0; // a caso
 
 const uint16_t primary_service_uuid         = ESP_GATT_UUID_PRI_SERVICE;
 const uint16_t character_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
@@ -121,6 +124,25 @@ const esp_gatts_attr_db_t gatt_db[HRS_IDX_NB] =
 			 sizeof(wifi_password), sizeof(wifi_password), (uint8_t *)wifi_password}},
 
 	// WIFI SSID Password -->
+
+	 // Table 1 --> -->
+
+	  /* Characteristic Declaration */
+	 [IDX_CHAR_TABLE_1]     =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+	   CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write}},
+
+	  /* Characteristic Value */
+	  [IDX_CHAR_VAL_TABLE_1] =
+	  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&UUID_TABLE_1, ESP_GATT_PERM_WRITE ,
+		sizeof(wifi_config.sta.password),sizeof(wifi_config.sta.password),(uint8_t *)wifi_config.sta.password}},
+
+	  /* Characteristic User Descriptor */
+	 [IDX_CHAR_CFG_TABLE_1]  =
+	 {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_user_description, ESP_GATT_PERM_READ,
+			 sizeof(Label_table[0]), sizeof(Label_table[0]), (uint8_t *)Label_table[0]}},
+
+	// Table 1 -->
 
 
 
