@@ -32,6 +32,7 @@
 #include "esp_event.h"
 
 // costum header files
+#include "Eeprom.h"
 #include "database_ble.h"
 #include "General_def.h"
 #include "UserCostumData.h"
@@ -40,7 +41,7 @@
 
 static uint8_t adv_config_done       = 0;
 
-uint16_t gatt_db_handle_table[HRS_IDX_NB];
+
 
 
 typedef struct {
@@ -388,6 +389,8 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             if(gatt_db_handle_table[IDX_CHAR_VAL_B] == param->read.handle) {
                 ESP_LOGE(EXAMPLE_TAG, "(5) ***** read char2 ***** ");
             }
+
+            command_from_read(param->read.handle);
        	    break;
         case ESP_GATTS_WRITE_EVT:
             if (!param->write.is_prep){
@@ -432,33 +435,37 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 /* handle prepare write */
                 example_prepare_write_event_env(gatts_if, &prepare_write_env, param);
             }
+
             gatt_db_value_table_manager(UPDATE_FROM_WRITE);
+
+            command_from_write(param->write.handle,param->write.value);
+
             // debug ()
-            if (MotorDefault.power == 0xFF){
-            	esp_restart();
-            }
-            if (*param->write.value == 0xEE){
-            	global_req_size = sizeof(MotorDefault2);
-            	nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
-            	nvs_commit(MotorFlash);
-            	asm("nop");
-            }
+//            if (MotorDefault.power == 0xFF){
+//            	esp_restart();
+//            }
+//            if (*param->write.value == 0xEE){
+//            	global_req_size = sizeof(MotorDefault2);
+//            	nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
+//            	nvs_commit(MotorFlash);
+//            	asm("nop");
+//            }
 
 
 
             // debug ()
 
             // Wifi -->
-            if (gatt_db_handle_table[IDX_CHAR_VAL_WIFI_PSW] == param->write.handle)
-            {
-
-            	    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA,&wifi_config));
-            	    ESP_ERROR_CHECK(esp_wifi_start());// starts wifi usage
-            	    if (wifi_config.sta.password[0] != '\0')
-            	    	ESP_ERROR_CHECK(esp_wifi_connect());
-            	    else
-            	    	ESP_ERROR_CHECK(esp_wifi_disconnect());
-            }
+//            if (gatt_db_handle_table[IDX_CHAR_VAL_WIFI_PSW] == param->write.handle)
+//            {
+//
+//            	    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA,&wifi_config));
+//            	    ESP_ERROR_CHECK(esp_wifi_start());// starts wifi usage
+//            	    if (wifi_config.sta.password[0] != '\0')
+//            	    	ESP_ERROR_CHECK(esp_wifi_connect());
+//            	    else
+//            	    	ESP_ERROR_CHECK(esp_wifi_disconnect());
+//            }
             // Wif <--
 
       	    break;
@@ -498,7 +505,6 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 memcpy(gatt_db_handle_table, param->add_attr_tab.handles, sizeof(gatt_db_handle_table));
                 esp_ble_gatts_start_service(gatt_db_handle_table[IDX_SVC]);
 
-//            	esp_ble_gatts_get_attr_value(gatt_db_handle_table[IDX_CHAR_CFG_A],  &length, &prf_char_max);
 
                 /*Initialization of spiderman_db_value_table, local variable that contains a key-value copy of the gatt_db
                  * Must call it immidiately after esp_ble_gatts_start_service*/
@@ -548,90 +554,85 @@ void app_main(void)
 {
 	esp_err_t ret;
 	size_t require_size;
-	/* Initialize NVS. */
-	ret = nvs_flash_init();
-	if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-		ESP_ERROR_CHECK(nvs_flash_erase());
-		ret = nvs_flash_init();
-	}
-	ESP_ERROR_CHECK( ret );
 
 
+	start_non_volatile_storage();
 
-	ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
-	ret = nvs_open("storage2", NVS_READWRITE, &WifiDataFlash);
-	//
-	/*Non serve volendo*/
-	if (ret != ESP_OK) {
-		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
-	} else {
-		printf("Done\n");
-	} /*Non serve volendo*/
-
-	//       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size ); // serve ad assegnare la giusta required_size
-	require_size = sizeof(MotorDefault);
-	ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
-	//
-	switch (ret) {
-	case ESP_OK:
-		printf("Done\n\n");
-		printf("Buffer = %s\n\n", MotorDefault.name);
-		printf("Number 1 = %i\n\n", MotorDefault.power);
-		printf("Number 2 = %i\n\n", MotorDefault.operating_hours);
-		asm("nop");
-		break;
-	case ESP_ERR_NVS_NOT_FOUND:
-		printf("The value is not initialized yet!\n");
-		required_size = sizeof(MotorDefault);
-		memset(MotorDefault.name, 0, sizeof(MotorDefault.name));
-		strcpy(MotorDefault.name,"Motor");
-		MotorDefault.operating_hours = 14;
-		MotorDefault.power = 130;
-		break;
-	case ESP_ERR_NVS_KEY_TOO_LONG:
-		ret = nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
-		ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
-		ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
-
-		if (ret != ESP_OK) {
-			printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
-		} else {
-			printf("Done\n");
-		}
-		break;
-	default :
-		printf("Error (%s) reading!\n", esp_err_to_name(ret));
-
-	}
-
-		require_size = sizeof(Wifidataram);
-		ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/&Wifidataram, &require_size);
-		//
-		switch (ret) {
-		case ESP_OK:
-			printf("Done\n\n");
-
-			asm("nop");
-			break;
-		case ESP_ERR_NVS_NOT_FOUND:
-			printf("The value is not initialized yet!\n");
-
-			break;
-		case ESP_ERR_NVS_KEY_TOO_LONG:
-			ret = nvs_set_blob(WifiDataFlash, "wifi_flash", &Wifidataram, sizeof (Wifidataram) );
-			ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/NULL, &require_size);;
-			ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/&Wifidataram, &require_size);;
-
-			if (ret != ESP_OK) {
-				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
-			} else {
-				printf("Done\n");
-			}
-			break;
-		default :
-			printf("Error (%s) reading!\n", esp_err_to_name(ret));
-
-		}
+//
+//	ret = nvs_open("storage", NVS_READWRITE, &MotorFlash);
+//	ret = nvs_open("storage2", NVS_READWRITE, &WifiDataFlash);
+//	//
+//	/*Non serve volendo*/
+//	if (ret != ESP_OK) {
+//		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+//	} else {
+//		printf("Done\n");
+//	} /*Non serve volendo*/
+//
+//	//       ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size ); // serve ad assegnare la giusta required_size
+//	require_size = sizeof(MotorDefault);
+//	ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
+//	//
+//	switch (ret) {
+//	case ESP_OK:
+//		printf("Done\n\n");
+//		printf("Buffer = %s\n\n", MotorDefault.name);
+//		printf("Number 1 = %i\n\n", MotorDefault.power);
+//		printf("Number 2 = %i\n\n", MotorDefault.operating_hours);
+//		asm("nop");
+//		break;
+//	case ESP_ERR_NVS_NOT_FOUND:
+//		printf("The value is not initialized yet!\n");
+//		required_size = sizeof(MotorDefault);
+//		memset(MotorDefault.name, 0, sizeof(MotorDefault.name));
+//		strcpy(MotorDefault.name,"Motor");
+//		MotorDefault.operating_hours = 14;
+//		MotorDefault.power = 130;
+//		break;
+//	case ESP_ERR_NVS_KEY_TOO_LONG:
+//		ret = nvs_set_blob(MotorFlash, "nvs_struct", &MotorDefault, sizeof (MotorDefault) );
+//		ret = nvs_get_blob(MotorFlash, "nvs_struct", NULL, &required_size );
+//		ret = nvs_get_blob(MotorFlash, "nvs_struct", /*(void *)*/&MotorDefault, &require_size);
+//
+//		if (ret != ESP_OK) {
+//			printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+//		} else {
+//			printf("Done\n");
+//		}
+//		break;
+//	default :
+//		printf("Error (%s) reading!\n", esp_err_to_name(ret));
+//
+//	}
+//
+//		require_size = sizeof(Wifidataram);
+//		ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/&Wifidataram, &require_size);
+//		//
+//		switch (ret) {
+//		case ESP_OK:
+//			printf("Done\n\n");
+//
+//			asm("nop");
+//			break;
+//		case ESP_ERR_NVS_NOT_FOUND:
+//			printf("The value is not initialized yet!\n");
+//
+//			break;
+//		case ESP_ERR_NVS_KEY_TOO_LONG:
+//			ret = nvs_set_blob(WifiDataFlash, "wifi_flash", &Wifidataram, sizeof (Wifidataram) );
+//			ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/NULL, &require_size);;
+//			ret = nvs_get_blob(WifiDataFlash, "wifi_flash", /*(void *)*/&Wifidataram, &require_size);;
+//
+//			if (ret != ESP_OK) {
+//				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+//			} else {
+//				printf("Done\n");
+//			}
+//			break;
+//		default :
+//			printf("Error (%s) reading!\n", esp_err_to_name(ret));
+//
+//		}
 
 	wifi_scan();
 
@@ -712,6 +713,19 @@ void app_main(void)
     wifi_init_config_t wifi_config_init = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wifi_config_init));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+
+    // connessione automatica all'avvio, da mettere più pulita altrove
+    if ( (Wifidataram[0][0]!= '\0') && (Wifidataram[1][0] != '\0') )
+    {
+    	gatt_db_value_table_manager(WIFI_STARTUP);
+    	ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA,&wifi_config));
+    	ESP_ERROR_CHECK(esp_wifi_start());// starts wifi usage
+    	if (wifi_config.sta.password[0] != '\0')
+    		ESP_ERROR_CHECK(esp_wifi_connect());
+    	else
+    		ESP_ERROR_CHECK(esp_wifi_disconnect());
+
+    }
 
 
     // Task costum

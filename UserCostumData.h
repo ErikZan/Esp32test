@@ -27,6 +27,8 @@ struct MotorDefault_struct{
 extern struct MotorDefault_struct MotorDefault;
 extern struct MotorDefault_struct MotorDefault2;
 
+extern struct MotorDefault_struct MotorDefaultEeprom;
+
 
 
 

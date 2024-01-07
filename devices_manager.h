@@ -21,7 +21,7 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 
-
+extern uint16_t gatt_db_handle_table[HRS_IDX_NB];
 extern uint8_t gatt_db_value_table[HRS_IDX_NB];
 extern uint8_t *spiderman_db_value_table[HRS_IDX_NB][TOTAL_SIZE];
 
@@ -33,6 +33,8 @@ extern nvs_handle_t WifiDataFlash;
 extern void show_bonded_devices(void);
 extern void __attribute__((unused)) remove_all_bonded_devices(void);
 extern void gatt_db_value_table_manager(gatt_value_operation gatt_value_operation_act);
+extern void command_from_read(uint16_t read_id);
+extern void command_from_write(uint16_t write_id,uint8_t *write_value);
 
 
 

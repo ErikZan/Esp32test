@@ -55,6 +55,7 @@ typedef enum
 	WRITE_TO_FLASH,
 	INIT_FROM_BLE_STACK,
 	UPDATE_FROM_WRITE,
+	WIFI_STARTUP,
 } gatt_value_operation;
 
 enum
